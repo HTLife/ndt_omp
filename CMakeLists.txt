@@ -8,12 +8,12 @@ set(CMAKE_CXX_FLAGS "-std=c++11 -msse -msse2 -msse3 -msse4 -msse4.1 -msse4.2")
 # pcl 1.7 causes a segfault when it is built with debug mode
 set(CMAKE_BUILD_TYPE "RELEASE")
 
-find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  pcl_ros
-)
+# find_package(catkin REQUIRED COMPONENTS
+#   roscpp
+#   pcl_ros
+# )
 
-find_package(PCL 1.7 REQUIRED)
+find_package(PCL 1.9 REQUIRED)
 include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
@@ -31,18 +31,18 @@ endif()
 ###################################
 ## catkin specific configuration ##
 ###################################
-catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES ndt_omp
-)
+# catkin_package(
+#   INCLUDE_DIRS include
+#   LIBRARIES ndt_omp
+# )
 
 ###########
 ## Build ##
 ###########
 include_directories(include)
-include_directories(
-  ${catkin_INCLUDE_DIRS}
-)
+# include_directories(
+#   ${catkin_INCLUDE_DIRS}
+# )
 
 add_library(ndt_omp
   src/pclomp/voxel_grid_covariance_omp.cpp
@@ -57,7 +57,6 @@ add_dependencies(align
   ndt_omp
 )
 target_link_libraries(align
-  ${catkin_LIBRARIES}
   ${PCL_LIBRARIES}
   ndt_omp
 )

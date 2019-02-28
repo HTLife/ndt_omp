@@ -1,5 +1,5 @@
 #include <iostream>
-#include <ros/ros.h>
+// #include <ros/ros.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
@@ -15,16 +15,16 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr align(pcl::Registration<pcl::PointXYZ, pcl::
   registration->setInputSource(source_cloud);
   pcl::PointCloud<pcl::PointXYZ>::Ptr aligned(new pcl::PointCloud<pcl::PointXYZ>());
 
-  auto t1 = ros::WallTime::now();
+  // auto t1 = ros::WallTime::now();
   registration->align(*aligned);
-  auto t2 = ros::WallTime::now();
-  std::cout << "single : " << (t2 - t1).toSec() * 1000 << "[msec]" << std::endl;
+  // auto t2 = ros::WallTime::now();
+  // std::cout << "single : " << (t2 - t1).toSec() * 1000 << "[msec]" << std::endl;
 
   for(int i=0; i<10; i++) {
     registration->align(*aligned);
   }
-  auto t3 = ros::WallTime::now();
-  std::cout << "10times: " << (t3 - t2).toSec() * 1000 << "[msec]" << std::endl;
+  // auto t3 = ros::WallTime::now();
+  // std::cout << "10times: " << (t3 - t2).toSec() * 1000 << "[msec]" << std::endl;
   std::cout << "fitness: " << registration->getFitnessScore() << std::endl << std::endl;
 
   return aligned;
@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
   voxelgrid.filter(*downsampled);
   source_cloud = downsampled;
 
-  ros::Time::init();
+  // ros::Time::init();
 
   // benchmark
   std::cout << "--- pcl::NDT ---" << std::endl;
