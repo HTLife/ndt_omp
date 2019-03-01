@@ -1,4 +1,8 @@
 #include "ndt_omp.h"
+
+
+#include <omp.h>
+
 /*
  * Software License Agreement (BSD License)
  *

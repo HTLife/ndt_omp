@@ -36,25 +36,17 @@ endif()
 file(GLOB SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/pclomp/*.cpp)
 
 # Set HEADERS variable
-file(GLOB HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/include/pclomp/*.h)
+file(GLOB HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/include/pclomp/*.h ${CMAKE_CURRENT_SOURCE_DIR}/include/pclomp/*.hpp)
 
-include(${CMAKE_SOURCE_DIR}/cmake/LibraryConfig.cmake)
-
-
-# Library sources
-#add_subdirectory(${LIBRARY_FOLDER})
-
-# Install targets
-#include(${CMAKE_SOURCE_DIR}/cmake/InstallConfig.cmake)
-
-
-###################################
-## catkin specific configuration ##
-###################################
-# catkin_package(
-#   INCLUDE_DIRS include
-#   LIBRARIES ndt_omp
+# install library
+include_directories(include)
+# add_library(${LIBRARY_NAME}
+#   src/pclomp/voxel_grid_covariance_omp.cpp
+#   src/pclomp/ndt_omp.cpp
+#   src/pclomp/gicp_omp.cpp
 # )
+include(${CMAKE_SOURCE_DIR}/cmake/LibraryConfig.cmake)
+target_link_libraries(${LIBRARY_NAME} ${PCL_LIBRARIES})
 
 # Introduce variables:
 # * CMAKE_INSTALL_LIBDIR
@@ -96,7 +88,7 @@ install(
 ###########
 ## Build ##
 ###########
-include_directories(include)
+
 
 # Install library
 install(TARGETS ${LIBRARY_NAME}
@@ -107,9 +99,9 @@ install(TARGETS ${LIBRARY_NAME}
 )
 
 # Export headers:
-install(
-  FILES ${HEADERS}
-  DESTINATION "${INSTALL_INCLUDE_DIR}/${LIBRARY_FOLDER}" )
+# install(
+#   FILES ${HEADERS}
+#   DESTINATION "${INSTALL_INCLUDE_DIR}/${LIBRARY_FOLDER}" )
 
 # Config
 #   * <prefix>/lib/cmake/Foo/FooConfig.cmake
@@ -126,51 +118,3 @@ install(
     NAMESPACE "${namespace}"
     DESTINATION "${config_install_dir}"
 )
-
-# message("##########################################")
-# message(${PROJECT_CONFIG})
-# include ( CMakePackageConfigHelpers )
-# set ( foo_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}" )
-# set ( CMAKE_CONFIG_DEST "share/cmake/Modules" )
-
-# # We configure our template. The template is described later.
-# configure_package_config_file (                         
-#         "./" + ${PROJECT_CONFIG}  ".cmake.in"
-#         "${CMAKE_BINARY_DIR}/"  ${PROJECT_CONFIG}  ".cmake"  
-#         INSTALL_DESTINATION "${CMAKE_CONFIG_DEST}"
-#         PATH_VARS foo_INCLUDE_DIRS )
-
-# # This file is included in our template:
-# export ( TARGETS foo_LIBRARIES FILE "${CMAKE_BINARY_DIR}/fooTargets.cmake" )
-
-# export ( PACKAGE foo ) 
-
-# Install headers
-
-
-
-# Install config
-
-
-
-
-# # include_directories(
-# #   ${catkin_INCLUDE_DIRS}
-# # )
-
-# add_library(ndt_omp
-#   src/pclomp/voxel_grid_covariance_omp.cpp
-#   src/pclomp/ndt_omp.cpp
-#   src/pclomp/gicp_omp.cpp
-# )
-
-# add_executable(align
-#   apps/align.cpp
-# )
-# add_dependencies(align
-#   ndt_omp
-# )
-# target_link_libraries(align
-#   ${PCL_LIBRARIES}
-#   ndt_omp
-# )
