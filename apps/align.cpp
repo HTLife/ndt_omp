@@ -94,14 +94,14 @@ int main(int argc, char** argv) {
   }
 
   // visulization
-  pcl::visualization::PCLVisualizer vis("vis");
-  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> target_handler(target_cloud, 255.0, 0.0, 0.0);
-  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> source_handler(source_cloud, 0.0, 255.0, 0.0);
-  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> aligned_handler(aligned, 0.0, 0.0, 255.0);
-  vis.addPointCloud(target_cloud, target_handler, "target");
-  vis.addPointCloud(source_cloud, source_handler, "source");
-  vis.addPointCloud(aligned, aligned_handler, "aligned");
-  vis.spin();
+  //pcl::visualization::PCLVisualizer vis("vis");
+  //pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> target_handler(target_cloud, 255.0, 0.0, 0.0);
+  //pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> source_handler(source_cloud, 0.0, 255.0, 0.0);
+  //pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> aligned_handler(aligned, 0.0, 0.0, 255.0);
+  //vis.addPointCloud(target_cloud, target_handler, "target");
+  //vis.addPointCloud(source_cloud, source_handler, "source");
+  //vis.addPointCloud(aligned, aligned_handler, "aligned");
+  //vis.spin();
 
   return 0;
 }
