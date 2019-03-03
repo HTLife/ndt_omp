@@ -26,7 +26,8 @@ namespace po = boost::program_options;
 
 bool process_command_line(int argc, char** argv,
                           std::string& dir,
-                          std::string& out)
+                          std::string& out,
+                          int &stopFrame)
 {
     try
     {
@@ -35,6 +36,7 @@ bool process_command_line(int argc, char** argv,
                 ("help",     "produce help message")
                 ("dir",   po::value<std::string>(&dir),      "set the pcd folder path")
                 ("out",   po::value<std::string>(&out),       "set the output pcd name")
+                ("stop",   po::value<int>(&stopFrame),       "set stop frame")
                 ;
 
         po::variables_map vm;
@@ -124,9 +126,53 @@ private:
 class CircularBuffer
 {
 public:
+    //typedef boost::circular_buffer< pcl::PointCloud<pcl::PointXYZ> > BoostCirclePointCloud;
+    typedef boost::circular_buffer< unsigned int > BoostCirclePointCloud;
+    CircularBuffer(
+        const int cloud_list_max_size,
+        pcl::PointCloud<pcl::PointXYZ>::Ptr target_cloud)
+    {
+        _cloud_list_max_size = cloud_list_max_size;
+        cloud_list = new BoostCirclePointCloud(_cloud_list_max_size);
 
+        _target_cloud = target_cloud;
+    }
+    ~CircularBuffer()
+    {
+        delete cloud_list;
+    }
+
+    void add(
+        pcl::PointCloud<pcl::PointXYZ> &transformed_cloud)
+    {
+        if(cloud_list->size()+1 < _cloud_list_max_size)
+        {
+            *_target_cloud += transformed_cloud;
+        } else { 
+            /// Remove front cloud
+            *_target_cloud += transformed_cloud;
+
+            pcl::ExtractIndices<pcl::PointXYZ> extract;
+            extract.setInputCloud(_target_cloud);
+
+            pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+            for (int i = 0; i < cloud_list->front(); i++)
+            {
+                inliers->indices.push_back(i);
+            }
+            extract.setIndices(inliers);
+            extract.setNegative(true);
+            extract.filter(*_target_cloud);
+        }
+        
+        cloud_list->push_back(transformed_cloud.size());
+    }
 private:
+    CircularBuffer(){}
 
+    BoostCirclePointCloud *cloud_list;
+    int _cloud_list_max_size;
+    pcl::PointCloud<pcl::PointXYZ>::Ptr _target_cloud;
 };
 
 
@@ -134,8 +180,8 @@ int main(int argc, char **argv)
 {
     std::string pcdFolderPath = "../../pcd_20190214_zmp_around";
     std::string pcdOutputName = "test_pcd.pcd";
-
-    bool result = process_command_line(argc, argv, pcdFolderPath, pcdOutputName);
+    int stopFrame = 0;
+    bool result = process_command_line(argc, argv, pcdFolderPath, pcdOutputName, stopFrame);
     if (!result)
     {
         return 1;
@@ -149,6 +195,10 @@ int main(int argc, char **argv)
     {
         std::cout << "Folder not found" << std::endl;
         exit(1);
+    }
+    if (0 == stopFrame)
+    {
+        stopFrame = vecFileList.size();
     }
 
 
@@ -167,15 +217,19 @@ int main(int argc, char **argv)
         std::cerr << "failed to load " << vecFileList[0] << std::endl;
         return 0;
     }
+    const int CLOUD_LIST_MAX_SIZE = 30;
+    // boost::circular_buffer< pcl::PointCloud<pcl::PointXYZ> > cloud_list(cloud_list_max_size);
+    // int cloud_list_size = 0;
+    CircularBuffer cloud_list(CLOUD_LIST_MAX_SIZE, target_cloud);
+
+
     Eigen::Matrix4f guess = Eigen::Matrix4f::Identity ();
 
     std::vector<Eigen::Matrix4f> acc_poses;
     acc_poses.push_back(guess);
     std::vector<Eigen::Matrix4f> edge_pose;
 
-    const int cloud_list_max_size = 300;
-    boost::circular_buffer< pcl::PointCloud<pcl::PointXYZ> > cloud_list(cloud_list_max_size);
-    int cloud_list_size = 0;
+    
 
 
     TimeElapsed timeElapsed;
@@ -204,8 +258,7 @@ int main(int argc, char **argv)
 
         if(0 == count) {
             *target_cloud = *downsampled;
-            cloud_list.push_back(*target_cloud);
-            cloud_list_size++;
+            cloud_list.add(*target_cloud);
         }
 
 
@@ -233,37 +286,13 @@ int main(int argc, char **argv)
         pcl::transformPointCloud (*source_cloud, transformed_cloud, guess);
 
 
-        cloud_list_size++;
-        /// Add point cloud
-        //*target_cloud += transformed_cloud;
-        if(cloud_list_size < cloud_list_max_size)
-        {
-            *target_cloud += transformed_cloud;
-        } else { // remove front
-            *target_cloud += transformed_cloud;
-            //*target_cloud -= cloud_list.front();
-            pcl::ExtractIndices<pcl::PointXYZ> extract;
-            extract.setInputCloud(target_cloud);
-
-
-            pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
-            for (int i = 0; i < cloud_list.front().size(); i++)
-            {
-                inliers->indices.push_back(i);
-            }
-            extract.setIndices(inliers);
-            extract.setNegative(true);
-            extract.filter(*target_cloud);
-        }
-
-        cloud_list.push_back(transformed_cloud);
-
+        cloud_list.add(transformed_cloud);
 
 
         timeElapsed.print(count++, vecFileList.size());
         
 
-        if (count > 10)
+        if (count >= stopFrame)
         {
             break;
         }
