@@ -12,6 +12,7 @@ set(CMAKE_BUILD_TYPE "RELEASE")
 #   roscpp
 #   pcl_ros
 # )
+FIND_PACKAGE( Boost 1.65 COMPONENTS program_options REQUIRED )
 
 find_package(PCL 1.7 REQUIRED)
 include_directories(${PCL_INCLUDE_DIRS})
@@ -59,4 +60,5 @@ add_dependencies(align
 target_link_libraries(align
   ${PCL_LIBRARIES}
   ndt_omp
+  Boost::program_options
 )

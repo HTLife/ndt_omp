@@ -9,99 +9,246 @@
 
 #include <pclomp/ndt_omp.h>
 
-// align point clouds and measure processing time
-pcl::PointCloud<pcl::PointXYZ>::Ptr align(pcl::Registration<pcl::PointXYZ, pcl::PointXYZ>::Ptr registration, const pcl::PointCloud<pcl::PointXYZ>::Ptr& target_cloud, const pcl::PointCloud<pcl::PointXYZ>::Ptr& source_cloud ) {
-  registration->setInputTarget(target_cloud);
-  registration->setInputSource(source_cloud);
-  pcl::PointCloud<pcl::PointXYZ>::Ptr aligned(new pcl::PointCloud<pcl::PointXYZ>());
+#include <boost/filesystem.hpp>
+#include <boost/timer.hpp>
+#include <vector>
+#include <Eigen/Dense>
 
-  // auto t1 = ros::WallTime::now();
-  registration->align(*aligned);
-  // auto t2 = ros::WallTime::now();
-  // std::cout << "single : " << (t2 - t1).toSec() * 1000 << "[msec]" << std::endl;
+#include <pcl/io/pcd_io.h>
 
-  for(int i=0; i<10; i++) {
-    registration->align(*aligned);
-  }
-  // auto t3 = ros::WallTime::now();
-  // std::cout << "10times: " << (t3 - t2).toSec() * 1000 << "[msec]" << std::endl;
-  std::cout << "fitness: " << registration->getFitnessScore() << std::endl << std::endl;
+#include <boost/program_options.hpp>
 
-  return aligned;
+#include <boost/circular_buffer.hpp>
+#include <pcl/filters/extract_indices.h>
+
+namespace fsys = boost::filesystem;
+namespace po = boost::program_options;
+
+bool process_command_line(int argc, char** argv,
+                          std::string& dir,
+                          std::string& out)
+{
+    try
+    {
+        po::options_description desc("Program Usage", 1024, 512);
+        desc.add_options()
+                ("help",     "produce help message")
+                ("dir",   po::value<std::string>(&dir),      "set the pcd folder path")
+                ("out",   po::value<std::string>(&out),       "set the output pcd name")
+                ;
+
+        po::variables_map vm;
+        po::store(po::parse_command_line(argc, argv, desc), vm);
+
+        if (vm.count("help"))
+        {
+            std::cout << desc << "\n";
+            return false;
+        }
+
+        // There must be an easy way to handle the relationship between the
+        // option "help" and "host"-"port"-"config"
+        // Yes, the magic is putting the po::notify after "help" option check
+        po::notify(vm);
+    }
+    catch(std::exception& e)
+    {
+        std::cerr << "Error: " << e.what() << "\n";
+        return false;
+    }
+    catch(...)
+    {
+        std::cerr << "Unknown error!" << "\n";
+        return false;
+    }
+
+    return true;
+}
+
+bool bGetFileList(
+    std::string strFolderPath, 
+    std::vector<std::string> &vecFileList)
+{
+    vecFileList.erase(vecFileList.begin(), vecFileList.end());
+    std::vector<fsys::path> flist;
+    bool bReturn = false;
+    fsys::path p(strFolderPath);
+    if (is_directory(p))
+    {
+        bReturn = true;
+        std::copy(fsys::directory_iterator(p), fsys::directory_iterator(), std::back_inserter(flist));
+        std::sort(flist.begin(), flist.end());
+
+        for (auto& it : flist)
+        {
+            vecFileList.push_back(fsys::canonical(it).string());
+        }
+    }
+    else
+    {
+        bReturn = false;
+    }
+    return bReturn;
 }
 
 
-int main(int argc, char** argv) {
-  if(argc != 3) {
-    std::cout << "usage: align target.pcd source.pcd" << std::endl;
-    return 0;
-  }
 
-  std::string target_pcd = argv[1];
-  std::string source_pcd = argv[2];
+int main(int argc, char **argv)
+{
+    std::string pcdFolderPath = "../../pcd_20190214_zmp_around";
+    std::string pcdOutputName = "test_pcd.pcd";
 
-  pcl::PointCloud<pcl::PointXYZ>::Ptr target_cloud(new pcl::PointCloud<pcl::PointXYZ>());
-  pcl::PointCloud<pcl::PointXYZ>::Ptr source_cloud(new pcl::PointCloud<pcl::PointXYZ>());
-
-  if(pcl::io::loadPCDFile(target_pcd, *target_cloud)) {
-    std::cerr << "failed to load " << target_pcd << std::endl;
-    return 0;
-  }
-  if(pcl::io::loadPCDFile(source_pcd, *source_cloud)) {
-    std::cerr << "failed to load " << source_pcd << std::endl;
-    return 0;
-  }
-
-  // downsampling
-  pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled(new pcl::PointCloud<pcl::PointXYZ>());
-
-  pcl::VoxelGrid<pcl::PointXYZ> voxelgrid;
-  voxelgrid.setLeafSize(0.1f, 0.1f, 0.1f);
-
-  voxelgrid.setInputCloud(target_cloud);
-  voxelgrid.filter(*downsampled);
-  *target_cloud = *downsampled;
-
-  voxelgrid.setInputCloud(source_cloud);
-  voxelgrid.filter(*downsampled);
-  source_cloud = downsampled;
-
-  // ros::Time::init();
-
-  // benchmark
-  std::cout << "--- pcl::NDT ---" << std::endl;
-  pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ>::Ptr ndt(new pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ>());
-  ndt->setResolution(1.0);
-  pcl::PointCloud<pcl::PointXYZ>::Ptr aligned = align(ndt, target_cloud, source_cloud);
-
-  std::vector<int> num_threads = {1, omp_get_max_threads()};
-  std::vector<std::pair<std::string, pclomp::NeighborSearchMethod>> search_methods = {
-    {"KDTREE", pclomp::KDTREE},
-    {"DIRECT7", pclomp::DIRECT7},
-    {"DIRECT1", pclomp::DIRECT1}
-  };
-
-  pclomp::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ>::Ptr ndt_omp(new pclomp::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ>());
-  ndt_omp->setResolution(1.0);
-
-  for(int n : num_threads) {
-    for(const auto& search_method : search_methods) {
-      std::cout << "--- pclomp::NDT (" << search_method.first << ", " << n << " threads) ---" << std::endl;
-      ndt_omp->setNumThreads(n);
-      ndt_omp->setNeighborhoodSearchMethod(search_method.second);
-      aligned = align(ndt_omp, target_cloud, source_cloud);
+    bool result = process_command_line(argc, argv, pcdFolderPath, pcdOutputName);
+    if (!result)
+    {
+        return 1;
     }
-  }
 
-  // visulization
-  //pcl::visualization::PCLVisualizer vis("vis");
-  //pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> target_handler(target_cloud, 255.0, 0.0, 0.0);
-  //pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> source_handler(source_cloud, 0.0, 255.0, 0.0);
-  //pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> aligned_handler(aligned, 0.0, 0.0, 255.0);
-  //vis.addPointCloud(target_cloud, target_handler, "target");
-  //vis.addPointCloud(source_cloud, source_handler, "source");
-  //vis.addPointCloud(aligned, aligned_handler, "aligned");
-  //vis.spin();
 
-  return 0;
+
+    /// Get file list
+    std::vector<std::string> vecFileList;
+    if(!bGetFileList(pcdFolderPath, vecFileList))
+    {
+        std::cout << "Folder not found" << std::endl;
+        exit(1);
+    }
+
+
+    /// NDT_omp
+    int num_threads = omp_get_max_threads();
+    pclomp::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ>::Ptr ndt_omp(
+            new pclomp::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ>());
+    ndt_omp->setResolution(1.0);//trans e =0.0001
+    ndt_omp->setTransformationEpsilon (0.0001);
+    ndt_omp->setNumThreads(num_threads);
+    ndt_omp->setNeighborhoodSearchMethod(pclomp::KDTREE);
+
+    /// Get first pcd
+    pcl::PointCloud<pcl::PointXYZ>::Ptr target_cloud(new pcl::PointCloud<pcl::PointXYZ>());
+    if(pcl::io::loadPCDFile(vecFileList[0], *target_cloud)) {
+        std::cerr << "failed to load " << vecFileList[0] << std::endl;
+        return 0;
+    }
+    Eigen::Matrix4f guess = Eigen::Matrix4f::Identity ();
+
+    std::vector<Eigen::Matrix4f> acc_poses;
+    acc_poses.push_back(guess);
+    std::vector<Eigen::Matrix4f> edge_pose;
+
+    const int cloud_list_max_size = 300;
+    boost::circular_buffer< pcl::PointCloud<pcl::PointXYZ> > cloud_list(cloud_list_max_size);
+    int cloud_list_size = 0;
+
+
+
+    boost::posix_time::ptime start = boost::posix_time::second_clock::local_time();
+    int count = 0;
+
+    for (auto it = vecFileList.begin() + 1 ; it != vecFileList.end(); it++)
+    {
+        std::string source_pcd = *it;
+
+        pcl::PointCloud<pcl::PointXYZ>::Ptr source_cloud(new pcl::PointCloud<pcl::PointXYZ>());
+
+        if(pcl::io::loadPCDFile(source_pcd, *source_cloud)) {
+          std::cerr << "failed to load " << source_pcd << std::endl;
+          return 0;
+        }
+
+        /// Downsampling
+        pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled(new pcl::PointCloud<pcl::PointXYZ>());
+
+        pcl::VoxelGrid<pcl::PointXYZ> voxelgrid;
+        voxelgrid.setLeafSize(0.2f, 0.2f, 0.2f);
+
+        voxelgrid.setInputCloud(target_cloud);
+        voxelgrid.filter(*downsampled);
+
+        if(0 == count) {
+            *target_cloud = *downsampled;
+            cloud_list.push_back(*target_cloud);
+            cloud_list_size++;
+        }
+
+
+        voxelgrid.setInputCloud(source_cloud);
+        voxelgrid.filter(*downsampled);
+        source_cloud = downsampled;
+
+
+
+
+        /// Registration
+        ndt_omp->setInputTarget(target_cloud);
+        ndt_omp->setInputSource(source_cloud);
+
+        pcl::PointCloud<pcl::PointXYZ> tmp_cloud;
+        ndt_omp->align(tmp_cloud, guess);
+
+        edge_pose.push_back(guess.inverse() * ndt_omp->getFinalTransformation());
+        guess = ndt_omp->getFinalTransformation();
+        acc_poses.push_back(guess);
+
+
+
+        pcl::PointCloud<pcl::PointXYZ> transformed_cloud;
+        pcl::transformPointCloud (*source_cloud, transformed_cloud, guess);
+
+
+        cloud_list_size++;
+        /// Add point cloud
+        //*target_cloud += transformed_cloud;
+        if(cloud_list_size < cloud_list_max_size)
+        {
+            *target_cloud += transformed_cloud;
+        } else { // remove front
+            *target_cloud += transformed_cloud;
+            //*target_cloud -= cloud_list.front();
+            pcl::ExtractIndices<pcl::PointXYZ> extract;
+            extract.setInputCloud(target_cloud);
+
+
+            pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
+            for (int i = 0; i < cloud_list.front().size(); i++)
+            {
+                inliers->indices.push_back(i);
+            }
+            extract.setIndices(inliers);
+            extract.setNegative(true);
+            extract.filter(*target_cloud);
+        }
+
+        cloud_list.push_back(transformed_cloud);
+
+
+
+
+        /// Time elapsed
+        boost::posix_time::ptime end = boost::posix_time::second_clock::local_time();
+        boost::posix_time::time_duration dur = end - start;
+        int elapsed_min = dur.minutes();
+        int elapsed_sec = dur.seconds() % 60;
+        /// Time remain
+        double timeForOneLoop = ((double)dur.seconds())/((double)count);
+        double loopRemained = vecFileList.size() - count;
+        int remain = timeForOneLoop * loopRemained;
+
+        std::cout << '\r'
+                  << (count++)+1 << " / " << vecFileList.size()
+                  << "  time elapsed:" <<  elapsed_min << "min "
+                  << elapsed_sec << "sec, Remain: "
+                  << remain/60 << "min" << remain % 60 << "sec" << std::flush;
+
+        if (count > 10)
+        {
+            break;
+        }
+
+    }
+    pcl::io::savePCDFileASCII (pcdOutputName, *target_cloud);
+    std::cerr << "\nSaved " << target_cloud->points.size () << " data points to test_pcd.pcd." << std::endl;
+
+
+    return 0;
 }
