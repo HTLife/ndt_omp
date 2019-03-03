@@ -92,6 +92,43 @@ bool bGetFileList(
 }
 
 
+class TimeElapsed
+{
+public:
+    TimeElapsed() {
+        _start = boost::posix_time::second_clock::local_time();
+    }
+    void print(int progress, int total)
+    {
+        /// Time elapsed
+        boost::posix_time::ptime end = boost::posix_time::second_clock::local_time();
+        boost::posix_time::time_duration dur = end - _start;
+        int elapsed_min = dur.minutes();
+        int elapsed_sec = dur.seconds() % 60;
+        /// Time remain
+        double timeForOneLoop = ((double)dur.seconds())/((double)progress);
+        double loopRemained = total - progress;
+        int remain = timeForOneLoop * loopRemained;
+
+        std::cout << '\r'
+                  << (progress)+1 << " / " << total
+                  << "  time elapsed:" <<  elapsed_min << "min "
+                  << elapsed_sec << "sec, Remain: "
+                  << remain/60 << "min" << remain % 60 << "sec          " << std::flush;
+    }
+private:
+    boost::posix_time::ptime _start;
+};
+
+
+class CircularBuffer
+{
+public:
+
+private:
+
+};
+
 
 int main(int argc, char **argv)
 {
@@ -141,8 +178,8 @@ int main(int argc, char **argv)
     int cloud_list_size = 0;
 
 
-
-    boost::posix_time::ptime start = boost::posix_time::second_clock::local_time();
+    TimeElapsed timeElapsed;
+    //boost::posix_time::ptime start = boost::posix_time::second_clock::local_time();
     int count = 0;
 
     for (auto it = vecFileList.begin() + 1 ; it != vecFileList.end(); it++)
@@ -223,22 +260,8 @@ int main(int argc, char **argv)
 
 
 
-
-        /// Time elapsed
-        boost::posix_time::ptime end = boost::posix_time::second_clock::local_time();
-        boost::posix_time::time_duration dur = end - start;
-        int elapsed_min = dur.minutes();
-        int elapsed_sec = dur.seconds() % 60;
-        /// Time remain
-        double timeForOneLoop = ((double)dur.seconds())/((double)count);
-        double loopRemained = vecFileList.size() - count;
-        int remain = timeForOneLoop * loopRemained;
-
-        std::cout << '\r'
-                  << (count++)+1 << " / " << vecFileList.size()
-                  << "  time elapsed:" <<  elapsed_min << "min "
-                  << elapsed_sec << "sec, Remain: "
-                  << remain/60 << "min" << remain % 60 << "sec" << std::flush;
+        timeElapsed.print(count++, vecFileList.size());
+        
 
         if (count > 10)
         {
