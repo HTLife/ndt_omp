@@ -22,7 +22,7 @@ set(INSTALL_INCLUDE_DIR include
 
 # INSTALL_CMAKE_DIR
 if(WIN32 AND NOT CYGWIN)
-  set(DEF_INSTALL_CMAKE_DIR cmake)
+  set(DEF_INSTALL_CMAKE_DIR CMake)
 else()
   set(DEF_INSTALL_CMAKE_DIR lib/cmake/${PROJECT_NAME})
 endif()
@@ -57,7 +57,6 @@ endif()
 
 # The export set for all the targets
 set(PROJECT_EXPORT ${PROJECT_NAME}EXPORT)
-set(PROJECT_CONFIG ${PROJECT_NAME}Config)
 
 # Path of the CNake files generated
 set(PROJECT_CMAKE_FILES ${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY})
